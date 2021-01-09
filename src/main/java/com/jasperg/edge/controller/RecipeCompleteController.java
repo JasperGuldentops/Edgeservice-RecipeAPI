@@ -182,6 +182,15 @@ public class RecipeCompleteController {
         return new RecipeComplete(recipe, user, ingredients);
     }
 
+    @PostMapping("/cookbook/user")
+    public UserNoId addUser(@RequestParam String firstName, @RequestParam String lastName, @RequestParam String email){
+
+        User user = restTemplate.postForObject("http://" + userServiceBaseUrl + "/users",
+                new User(firstName, lastName, email), User.class);
+
+        return new UserNoId(user.getFirstName(), user.getLastName(), user.getEmail(), user.getCode());
+    }
+
     @PutMapping("/cookbook")
     public RecipeComplete editRecipeComplete(@RequestParam String recipeCode,
                                             @RequestParam String recipeName,

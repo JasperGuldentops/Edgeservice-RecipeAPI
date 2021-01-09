@@ -403,6 +403,32 @@ public class RecipeCompleteControllerUnitTests {
     }
 
     @Test
+    public void whenAddUser_thenReturnUserNoIdJson() throws Exception {
+
+        // POST user
+        mockServer.expect(ExpectedCount.once(),
+                requestTo(new URI("http://" + userServiceBaseUrl + "/users")))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withStatus(HttpStatus.OK)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(mapper.writeValueAsString(user1))
+                );
+
+        mockMvc.perform(post("/cookbook/user")
+                .param("firstName", user1.getFirstName())
+                .param("lastName", user1.getLastName())
+                .param("email", user1.getEmail())
+
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+
+                .andExpect(jsonPath("$.name", is("Jasper Guldentops")))
+                .andExpect(jsonPath("$.email", is("jg@gmail.com")))
+                .andExpect(jsonPath("$.code", is("jg@gmail.com-0000")));
+    }
+
+    @Test
     public void whenUpdateCookbook_thenReturnCompletedRecipeJson() throws Exception {
 
         Recipe updatedRecipe = new Recipe("Pizza Bolognese", 60, "Roll dough, in oven, ready",
