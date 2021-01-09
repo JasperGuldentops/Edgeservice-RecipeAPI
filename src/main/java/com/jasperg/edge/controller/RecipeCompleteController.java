@@ -1,17 +1,13 @@
 package com.jasperg.edge.controller;
 
-import com.jasperg.edge.model.Ingredient;
-import com.jasperg.edge.model.Recipe;
-import com.jasperg.edge.model.RecipeComplete;
-import com.jasperg.edge.model.User;
+import com.jasperg.edge.model.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
@@ -32,7 +28,31 @@ public class RecipeCompleteController {
     @Value("${ingredientservice.baseurl}")
     private String ingredientServiceBaseUrl;
 
-    @GetMapping("/recipes/recipe/name/{name}")
+    @GetMapping("/cookbook/recipes")
+    public List<RecipeComplete> getAllRecipes(){
+
+        List<RecipeComplete> returnList= new ArrayList();
+
+        ResponseEntity<List<Recipe>> responseEntityRecipes =
+                restTemplate.exchange(
+                        "http://" + recipeServiceBaseUrl + "/recipes",
+                        HttpMethod.GET, null, new ParameterizedTypeReference<List<Recipe>>() {});
+
+        List<Recipe> recipes = responseEntityRecipes.getBody();
+
+        for (Recipe recipe: recipes) {
+
+            User user = getUserByUserCode(recipe.getUserCode());
+
+            List<Ingredient> ingredients = getIngredientsByRecipeCode(recipe.getCode());
+
+            returnList.add(new RecipeComplete(recipe, user, ingredients));
+        }
+
+        return returnList;
+    }
+
+    @GetMapping("/cookbook/recipe/name/{name}")
     public List<RecipeComplete> getRecipesByRecipeName(@PathVariable String name){
 
         List<RecipeComplete> returnList= new ArrayList();
@@ -57,7 +77,7 @@ public class RecipeCompleteController {
         return returnList;
     }
 
-    @GetMapping("/recipes/user/code/{code}")
+    @GetMapping("/cookbook/user/code/{code}")
     public List<RecipeComplete> getRecipesByUserCode(@PathVariable String code){
 
         List<RecipeComplete> returnList= new ArrayList();
@@ -66,7 +86,7 @@ public class RecipeCompleteController {
 
         ResponseEntity<List<Recipe>> responseEntityRecipes =
                 restTemplate.exchange(
-                        "http://" + recipeServiceBaseUrl + "/recipes/usercode/{userCode}",
+                        "http://" + recipeServiceBaseUrl + "/recipes/userCode/{userCode}",
                         HttpMethod.GET, null, new ParameterizedTypeReference<List<Recipe>>() {},
                         user.getCode());
 
@@ -82,7 +102,7 @@ public class RecipeCompleteController {
         return returnList;
     }
 
-    @GetMapping("/recipes/ingredient/name/{name}")
+    @GetMapping("/cookbook/ingredient/name/{name}")
     public List<RecipeComplete> getRecipesByIngredient(@PathVariable String name){
 
         List<RecipeComplete> returnList= new ArrayList();
@@ -110,16 +130,17 @@ public class RecipeCompleteController {
                     Recipe.class, recipeCode);
 
             List<Ingredient> recipeIngredients = getIngredientsByRecipeCode(recipe.getCode());
+
             User user = getUserByUserCode(recipe.getUserCode());
 
-            returnList.add(new RecipeComplete(recipe, user, ingredients));
+            returnList.add(new RecipeComplete(recipe, user, recipeIngredients));
         }
 
         return returnList;
     }
 
-    @GetMapping("/recipes/recipe/code/{code}")
-    public RecipeComplete getRecipesByRecipeCode(@PathVariable String code){
+    @GetMapping("/cookbook/recipe/code/{code}")
+    public RecipeComplete getRecipeByRecipeCode(@PathVariable String code){
 
         Recipe recipe = restTemplate.getForObject(
                 "http://" + recipeServiceBaseUrl + "/recipes/code/{code}",
@@ -131,6 +152,74 @@ public class RecipeCompleteController {
         RecipeComplete recipeComplete = new RecipeComplete(recipe, user, ingredients);
 
         return recipeComplete;
+    }
+
+    @PostMapping("/cookbook")
+    public RecipeComplete addRecipeComplete(@RequestParam String userCode,
+                                            @RequestParam String recipeName,
+                                            @RequestParam int cookingTime,
+                                            @RequestParam String recipeDescription,
+                                            @RequestParam List<RecipeIngredient> recipeIngredients){
+
+        User user = getUserByUserCode(userCode);
+
+        Recipe recipe = restTemplate.postForObject("http://" + recipeDescription + "/recipes",
+                new Recipe(recipeName,cookingTime,recipeDescription, userCode), Recipe.class);
+
+        List<Ingredient> ingredients = new ArrayList<>();
+
+        for (RecipeIngredient recipeIngredient: recipeIngredients) {
+            Ingredient ingredient = restTemplate.postForObject("http://" + ingredientServiceBaseUrl + "/ingredients",
+                    new Ingredient(
+                            recipeIngredient.getName(),
+                            recipeIngredient.getAmount(),
+                            recipe.getCode()
+                    ), Ingredient.class);
+            ingredients.add(ingredient);
+        }
+
+        return new RecipeComplete(recipe, user, ingredients);
+    }
+
+    @PutMapping("/rankings")
+    public RecipeComplete editRecipeComplete(@RequestParam String recipeCode,
+                                            @RequestParam String recipeName,
+                                            @RequestParam int cookingTime,
+                                            @RequestParam String recipeDescription){
+
+        Recipe recipe = restTemplate.getForObject("http://" + recipeServiceBaseUrl + "/recipes/code/",
+                Recipe.class, recipeCode);
+
+        recipe.setName(recipeName);
+        recipe.setCookingTime(cookingTime);
+        recipe.setDescription(recipeDescription);
+
+        ResponseEntity<Recipe> responseEntityRecipe =
+                restTemplate.exchange("http://" + recipeServiceBaseUrl + "/recipes",
+                        HttpMethod.PUT, new HttpEntity<>(recipe), Recipe.class);
+
+        Recipe retrievedRecipe = responseEntityRecipe.getBody();
+
+        User user = getUserByUserCode(recipe.getUserCode());
+
+        List<Ingredient> ingredients = getIngredientsByRecipeCode(recipe.getCode());
+
+        return new RecipeComplete(retrievedRecipe, user, ingredients);
+    }
+
+    @DeleteMapping("/rankings/recipe/{code}")
+    public ResponseEntity deleteRanking(@PathVariable String code){
+
+        List<Ingredient> ingredients = getIngredientsByRecipeCode(code);
+
+        for (Ingredient ingredient:
+             ingredients) {
+            restTemplate.delete("http://" + ingredientServiceBaseUrl + "/ingredients/{code}", ingredient.getCode());
+        }
+
+        restTemplate.delete("http://" + recipeServiceBaseUrl + "/recipes/{code}", code);
+
+        return ResponseEntity.ok().build();
     }
 
     private List<Ingredient> getIngredientsByRecipeCode(String recipeCode) {
@@ -152,4 +241,5 @@ public class RecipeCompleteController {
 
         return user;
     }
+
 }

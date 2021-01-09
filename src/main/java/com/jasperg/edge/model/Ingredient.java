@@ -15,6 +15,19 @@ public class Ingredient {
     public Ingredient() {
     }
 
+    public Ingredient(String name, int amount, String recipeCode) {
+        this.name = name;
+        this.amount = amount;
+        this.recipeCode = recipeCode;
+    }
+
+    public Ingredient(String name, int amount, String recipeCode, String code) {
+        this.name = name;
+        this.amount = amount;
+        this.recipeCode = recipeCode;
+        this.code = code;
+    }
+
     public int getId() {
         return id;
     }

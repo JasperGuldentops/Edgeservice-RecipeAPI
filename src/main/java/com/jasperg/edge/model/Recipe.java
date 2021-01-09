@@ -4,12 +4,27 @@ public class Recipe {
 
     private String id;
     private String name;
-    private Integer cookingTime;
+    private int cookingTime;
     private String description;
     private String userCode;
     private String code;
 
     public Recipe() {
+    }
+
+    public Recipe(String name, int cookingTime, String description, String userCode) {
+        this.name = name;
+        this.cookingTime = cookingTime;
+        this.description = description;
+        this.userCode = userCode;
+    }
+
+    public Recipe(String name, int cookingTime, String description, String userCode, String code) {
+        this.name = name;
+        this.cookingTime = cookingTime;
+        this.description = description;
+        this.userCode = userCode;
+        this.code = code;
     }
 
     public String getId() {
