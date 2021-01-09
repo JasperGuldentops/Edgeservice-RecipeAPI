@@ -3,6 +3,7 @@ package com.jasperg.edge;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jasperg.edge.model.Ingredient;
 import com.jasperg.edge.model.Recipe;
+import com.jasperg.edge.model.RecipeIngredient;
 import com.jasperg.edge.model.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -330,4 +332,164 @@ public class RecipeCompleteControllerUnitTests {
                 .andExpect(jsonPath("$.recipeIngredients[0].name", is("Potato")))
                 .andExpect(jsonPath("$.recipeIngredients[0].amount", is(5)));
     }
+
+    @Test
+    public void whenAddCookbook_thenReturnRecipeCompleteJson() throws Exception {
+
+        Recipe recipe3 = new Recipe("Soup", 120, "Boil water, add tomato, done",
+                "jg@gmail.com-0000");
+
+        RecipeIngredient recipeIngredient1 = new RecipeIngredient("Tomato", 5);
+        RecipeIngredient recipeIngredient2 = new RecipeIngredient("Water", 500);
+
+        List<RecipeIngredient> recipeIngredients = Arrays.asList(recipeIngredient1);
+
+        // GET user2 from recipe
+        mockServer.expect(ExpectedCount.once(),
+                requestTo(new URI("http://" + userServiceBaseUrl + "/users/code/jg@gmail.com-0000")))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withStatus(HttpStatus.OK)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(mapper.writeValueAsString(user1))
+                );
+
+        // POST recipe
+        mockServer.expect(ExpectedCount.once(),
+                requestTo(new URI("http://" + recipeServiceBaseUrl + "/recipes")))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withStatus(HttpStatus.OK)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(mapper.writeValueAsString(recipe3))
+                );
+
+        // POST ingredient 1
+        Ingredient ingredient1 = new Ingredient(recipeIngredient1.getName(), recipeIngredient1.getAmount(),  recipe3.getCode());
+        mockServer.expect(ExpectedCount.once(),
+                requestTo(new URI("http://" + ingredientServiceBaseUrl + "/ingredients")))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withStatus(HttpStatus.OK)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(mapper.writeValueAsString(ingredient1))
+                );
+
+        // POST ingredient 2
+        Ingredient ingredient2 = new Ingredient(recipeIngredient2.getName(), recipeIngredient2.getAmount(),  recipe3.getCode());
+        mockServer.expect(ExpectedCount.once(),
+                requestTo(new URI("http://" + ingredientServiceBaseUrl + "/ingredients")))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withStatus(HttpStatus.OK)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(mapper.writeValueAsString(ingredient2))
+                );
+
+        mockMvc.perform(post("/cookbook")
+                .param("name", recipe3.getName())
+                .param("cookingTime", recipe3.getCookingTime().toString())
+                .param("description", recipe3.getDescription())
+                .param("userCode", recipe3.getUserCode())
+                .param("recipeIngredients", ingredient1.getName() + "-" + ingredient1.getAmount())
+                .param("recipeIngredients", ingredient2.getName() + "-" + ingredient2.getAmount())
+
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+
+                .andExpect(jsonPath("$.recipeName", is("Soup")))
+                .andExpect(jsonPath("$.recipeDescription", is("Boil water, add tomato, done")))
+                .andExpect(jsonPath("$.cookingTime", is("2 uur")))
+                .andExpect(jsonPath("$.creatorName", is("Jasper Guldentops")))
+                .andExpect(jsonPath("$.recipeIngredients[0].name", is("Tomato")))
+                .andExpect(jsonPath("$.recipeIngredients[0].amount", is(5)));
+    }
+
+    @Test
+    public void whenUpdateCookbook_thenReturnCompletedRecipeJson() throws Exception {
+
+        Recipe updatedRecipe = new Recipe("Pizza Bolognese", 60, "Roll dough, in oven, ready",
+                "jg@gmail.com-0000", "Pizza-0000");
+
+        // GET recipe to update
+        mockServer.expect(ExpectedCount.once(),
+                requestTo(new URI("http://" + recipeServiceBaseUrl + "/recipes/code/Pizza-0000")))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withStatus(HttpStatus.OK)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(mapper.writeValueAsString(recipe1))
+                );
+
+        // PUT new updated recipe
+        mockServer.expect(ExpectedCount.once(),
+                requestTo(new URI("http://" + recipeServiceBaseUrl + "/recipes")))
+                .andExpect(method(HttpMethod.PUT))
+                .andRespond(withStatus(HttpStatus.OK)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(mapper.writeValueAsString(updatedRecipe))
+                );
+
+        // GET user info
+        mockServer.expect(ExpectedCount.once(),
+                requestTo(new URI("http://" + userServiceBaseUrl + "/users/code/jg@gmail.com-0000")))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withStatus(HttpStatus.OK)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(mapper.writeValueAsString(user1))
+                );
+
+        // GET all ingredients from pizza
+        mockServer.expect(ExpectedCount.once(),
+                requestTo(new URI("http://" + ingredientServiceBaseUrl + "/ingredients/recipeCode/Pizza-0000")))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withStatus(HttpStatus.OK)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(mapper.writeValueAsString(ingredient1List))
+                );
+
+        mockMvc.perform(put("/cookbook")
+                .param("recipeCode", updatedRecipe.getCode())
+                .param("recipeName", updatedRecipe.getName())
+                .param("cookingTime", updatedRecipe.getCookingTime().toString())
+                .param("recipeDescription", updatedRecipe.getDescription())
+
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+
+                .andExpect(jsonPath("$.recipeName", is("Pizza Bolognese")))
+                .andExpect(jsonPath("$.recipeDescription", is("Roll dough, in oven, ready")))
+                .andExpect(jsonPath("$.cookingTime", is("1 uur")))
+                .andExpect(jsonPath("$.creatorName", is("Jasper Guldentops")))
+                .andExpect(jsonPath("$.recipeIngredients[0].name", is("Tomato")))
+                .andExpect(jsonPath("$.recipeIngredients[0].amount", is(2)));
+
+    }
+
+    @Test
+    public void whenDeleteRanking_thenReturnStatusOk() throws Exception {
+
+        // GET ingredients to delete
+        mockServer.expect(ExpectedCount.once(),
+                requestTo(new URI("http://" + ingredientServiceBaseUrl + "/ingredients/recipeCode/Pizza-0000")))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withStatus(HttpStatus.OK)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(mapper.writeValueAsString(ingredient1List))
+                );
+
+        // DELETE any linked ingredients
+        mockServer.expect(ExpectedCount.once(),
+                requestTo(new URI("http://" + ingredientServiceBaseUrl + "/ingredients/Pizza-0000-0000")))
+                .andExpect(method(HttpMethod.DELETE))
+                .andRespond(withStatus(HttpStatus.OK)
+                );
+
+        // DELETE recipe
+        mockServer.expect(ExpectedCount.once(),
+                requestTo(new URI("http://" + recipeServiceBaseUrl + "/recipes/Pizza-0000")))
+                .andExpect(method(HttpMethod.DELETE))
+                .andRespond(withStatus(HttpStatus.OK)
+                );
+
+        mockMvc.perform(delete("/cookbook/recipe/{code}", "Pizza-0000"))
+                .andExpect(status().isOk());
+    }
+
 }

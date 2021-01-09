@@ -25,7 +25,7 @@ public class Ingredient {
         this.name = name;
         this.amount = amount;
         this.recipeCode = recipeCode;
-        this.code = code;
+        this.code = recipeCode + "-" + code;
     }
 
     public int getId() {

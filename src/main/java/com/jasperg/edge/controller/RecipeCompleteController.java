@@ -7,6 +7,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
@@ -155,24 +156,24 @@ public class RecipeCompleteController {
     }
 
     @PostMapping("/cookbook")
-    public RecipeComplete addRecipeComplete(@RequestParam String userCode,
-                                            @RequestParam String recipeName,
+    public RecipeComplete addRecipeComplete(@RequestParam String name,
                                             @RequestParam int cookingTime,
-                                            @RequestParam String recipeDescription,
-                                            @RequestParam List<RecipeIngredient> recipeIngredients){
+                                            @RequestParam String description,
+                                            @RequestParam String userCode,
+                                            @RequestParam List<String> recipeIngredients){
 
         User user = getUserByUserCode(userCode);
 
-        Recipe recipe = restTemplate.postForObject("http://" + recipeDescription + "/recipes",
-                new Recipe(recipeName,cookingTime,recipeDescription, userCode), Recipe.class);
+        Recipe recipe = restTemplate.postForObject("http://" + recipeServiceBaseUrl + "/recipes",
+                new Recipe(name, cookingTime, description, userCode), Recipe.class);
 
         List<Ingredient> ingredients = new ArrayList<>();
 
-        for (RecipeIngredient recipeIngredient: recipeIngredients) {
+        for (String recipeIngredient: recipeIngredients) {
             Ingredient ingredient = restTemplate.postForObject("http://" + ingredientServiceBaseUrl + "/ingredients",
                     new Ingredient(
-                            recipeIngredient.getName(),
-                            recipeIngredient.getAmount(),
+                            recipeIngredient.substring(0, recipeIngredient.indexOf('-')),
+                            Integer.parseInt(recipeIngredient.substring(recipeIngredient.indexOf('-'))),
                             recipe.getCode()
                     ), Ingredient.class);
             ingredients.add(ingredient);
@@ -181,14 +182,14 @@ public class RecipeCompleteController {
         return new RecipeComplete(recipe, user, ingredients);
     }
 
-    @PutMapping("/rankings")
+    @PutMapping("/cookbook")
     public RecipeComplete editRecipeComplete(@RequestParam String recipeCode,
                                             @RequestParam String recipeName,
                                             @RequestParam int cookingTime,
                                             @RequestParam String recipeDescription){
 
-        Recipe recipe = restTemplate.getForObject("http://" + recipeServiceBaseUrl + "/recipes/code/",
-                Recipe.class, recipeCode);
+        Recipe recipe = restTemplate.getForObject("http://" + recipeServiceBaseUrl + "/recipes/code/" + recipeCode,
+                Recipe.class);
 
         recipe.setName(recipeName);
         recipe.setCookingTime(cookingTime);
@@ -207,17 +208,17 @@ public class RecipeCompleteController {
         return new RecipeComplete(retrievedRecipe, user, ingredients);
     }
 
-    @DeleteMapping("/rankings/recipe/{code}")
+    @DeleteMapping("/cookbook/recipe/{code}")
     public ResponseEntity deleteRanking(@PathVariable String code){
 
         List<Ingredient> ingredients = getIngredientsByRecipeCode(code);
 
         for (Ingredient ingredient:
              ingredients) {
-            restTemplate.delete("http://" + ingredientServiceBaseUrl + "/ingredients/{code}", ingredient.getCode());
+            restTemplate.delete("http://" + ingredientServiceBaseUrl + "/ingredients/" + ingredient.getCode());
         }
 
-        restTemplate.delete("http://" + recipeServiceBaseUrl + "/recipes/{code}", code);
+        restTemplate.delete("http://" + recipeServiceBaseUrl + "/recipes/" + code);
 
         return ResponseEntity.ok().build();
     }
