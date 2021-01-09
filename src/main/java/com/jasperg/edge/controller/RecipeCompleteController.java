@@ -173,7 +173,7 @@ public class RecipeCompleteController {
             Ingredient ingredient = restTemplate.postForObject("http://" + ingredientServiceBaseUrl + "/ingredients",
                     new Ingredient(
                             recipeIngredient.substring(0, recipeIngredient.indexOf('-')),
-                            Integer.parseInt(recipeIngredient.substring(recipeIngredient.indexOf('-'))),
+                            Integer.parseInt(recipeIngredient.substring(recipeIngredient.indexOf('-') + 1)),
                             recipe.getCode()
                     ), Ingredient.class);
             ingredients.add(ingredient);
